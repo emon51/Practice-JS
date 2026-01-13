@@ -1,409 +1,615 @@
-// MOBILE GALLERY SLIDER
-const gallerySlider = document.querySelector(".gallery-slider");
-const galleryImages = document.querySelectorAll(".gallery-img");
-const dots = document.querySelectorAll(".dot");
+// ============================================================================
+// Travel API Backend - Complete Implementation (Fixed)
+// ============================================================================
 
-let currentGalleryIndex = 0;
-let galleryStartX = 0;
-let galleryEndX = 0;
+const { Pool } = require('pg');
+const express = require('express');
+const cors = require('cors');
+const axios = require('axios');
+require('dotenv').config();
 
-function showGalleryImage(index) {
-  galleryImages.forEach(img => img.classList.remove("active"));
-  dots.forEach(dot => dot.classList.remove("active"));
-  
-  galleryImages[index].classList.add("active");
-  dots[index].classList.add("active");
-}
-
-// Dot click navigation
-dots.forEach((dot) => {
-  dot.addEventListener("click", () => {
-    currentGalleryIndex = parseInt(dot.getAttribute("data-index"));
-    showGalleryImage(currentGalleryIndex);
-  });
+// -----------------------------
+// DATABASE CONNECTION
+// -----------------------------
+const pool = new Pool({
+    user: process.env.DB_USER,
+    host: process.env.DB_HOST,
+    database: process.env.DB_NAME,
+    password: process.env.DB_PASSWORD,
+    port: process.env.DB_PORT,
 });
 
-// Touch swipe for mobile gallery
-if (gallerySlider) {
-  gallerySlider.addEventListener("touchstart", (e) => {
-    galleryStartX = e.touches[0].clientX;
-  });
-
-  gallerySlider.addEventListener("touchmove", (e) => {
-    galleryEndX = e.touches[0].clientX;
-  });
-
-  gallerySlider.addEventListener("touchend", () => {
-    const diff = galleryStartX - galleryEndX;
-
-    if (Math.abs(diff) > 50) {
-      if (diff > 0) {
-        // Swipe left → next
-        currentGalleryIndex = (currentGalleryIndex + 1) % galleryImages.length;
-      } else {
-        // Swipe right → previous
-        currentGalleryIndex = (currentGalleryIndex - 1 + galleryImages.length) % galleryImages.length;
-      }
-      showGalleryImage(currentGalleryIndex);
-    }
-  });
-}
-
-// MODAL CODE (Desktop/Tablet)
-const modal = document.getElementById("imageModal");
-const viewBtn = document.getElementById("viewAllBtn");
-const closeBtn = document.querySelector(".close");
-const slides = document.querySelectorAll(".slide");
-const prevBtn = document.getElementById("prevBtn");
-const nextBtn = document.getElementById("nextBtn");
-
-let currentIndex = 0;
-
-function showSlide(index) {
-  slides.forEach(slide => slide.classList.remove("active"));
-  slides[index].classList.add("active");
-}
-
-// Open modal
-if (viewBtn) {
-  viewBtn.addEventListener("click", () => {
-    modal.style.display = "block";
-    document.body.style.overflow = "hidden";
-    showSlide(currentIndex);
-    updateModalButtons(); // Add this line
-  });
-}
-
-// Close modal
-if (closeBtn) {
-  closeBtn.addEventListener("click", () => {
-    modal.style.display = "none";
-    document.body.style.overflow = "auto";
-  });
-}
-
-// Update button states
-function updateModalButtons() {
-  if (prevBtn) prevBtn.disabled = currentIndex === 0;
-  if (nextBtn) nextBtn.disabled = currentIndex === slides.length - 1;
-}
-
-// Next
-if (nextBtn) {
-  nextBtn.addEventListener("click", () => {
-    if (currentIndex < slides.length - 1) {
-      currentIndex++;
-      showSlide(currentIndex);
-      updateModalButtons();
-    }
-  });
-}
-
-// Previous
-if (prevBtn) {
-  prevBtn.addEventListener("click", () => {
-    if (currentIndex > 0) {
-      currentIndex--;
-      showSlide(currentIndex);
-      updateModalButtons();
-    }
-  });
-}
-
-// SWIPE SUPPORT FOR MODAL (Desktop/Tablet)
-let startX = 0;
-let endX = 0;
-
-const slider = document.querySelector(".slider-wrapper");
-
-if (slider) {
-  // Touch start
-  slider.addEventListener("touchstart", (e) => {
-    startX = e.touches[0].clientX;
-  });
-
-  // Touch move
-  slider.addEventListener("touchmove", (e) => {
-    endX = e.touches[0].clientX;
-  });
-
-  // Touch end
-  slider.addEventListener("touchend", () => {
-    const diff = startX - endX;
-
-    // Minimum swipe distance
-    if (Math.abs(diff) > 50) {
-      if (diff > 0) {
-        // Swipe left → next image
-        currentIndex = (currentIndex + 1) % slides.length;
-      } else {
-        // Swipe right → previous image
-        currentIndex = (currentIndex - 1 + slides.length) % slides.length;
-      }
-      showSlide(currentIndex);
-    }
-  });
-}
-
-
-// BOOKING FUNCTIONALITY
-const pricePerNight = 2026;
-const checkInInput = document.getElementById("checkInDate");
-const checkOutInput = document.getElementById("checkOutDate");
-const totalPriceDisplay = document.getElementById("totalPrice");
-const displayPricePerNightElem = document.getElementById("displayPricePerNight");
-const pricePerNightElem = document.getElementById("pricePerNight");
-
-// Set initial price
-if (pricePerNightElem) pricePerNightElem.textContent = pricePerNight;
-if (displayPricePerNightElem) displayPricePerNightElem.textContent = pricePerNight;
-
-function calculateTotalPrice() {
-  const checkIn = new Date(checkInInput.value);
-  const checkOut = new Date(checkOutInput.value);
-  
-  if (checkIn && checkOut && checkOut > checkIn) {
-    const nights = Math.ceil((checkOut - checkIn) / (1000 * 60 * 60 * 24));
-    const total = nights * pricePerNight;
-    totalPriceDisplay.textContent = total.toLocaleString();
-  } else {
-    totalPriceDisplay.textContent = pricePerNight.toLocaleString();
-  }
-}
-
-// Set min date to today and validate dates
-function setDateConstraints() {
-  const today = new Date().toISOString().split('T')[0];
-  checkInInput.setAttribute('min', today);
-  
-  checkInInput.addEventListener('change', () => {
-    const checkInDate = checkInInput.value;
-    if (checkInDate) {
-      const minCheckOut = new Date(checkInDate);
-      minCheckOut.setDate(minCheckOut.getDate() + 1);
-      checkOutInput.setAttribute('min', minCheckOut.toISOString().split('T')[0]);
-      
-      if (checkOutInput.value && new Date(checkOutInput.value) <= new Date(checkInDate)) {
-        checkOutInput.value = minCheckOut.toISOString().split('T')[0];
-      }
-    }
-    calculateTotalPrice();
-  });
-  
-  checkOutInput.addEventListener('change', calculateTotalPrice);
-}
-
-// Initialize
-if (checkInInput && checkOutInput) {
-  setDateConstraints();
-  calculateTotalPrice();
-}
-
-// GUEST MODAL FUNCTIONALITY
-// GUEST MODAL FUNCTIONALITY
-const guestModal = document.getElementById("guestModal");
-const guestSelector = document.getElementById("guestSelector");
-const guestClose = document.querySelector(".guest-close");
-const guestDisplay = document.getElementById("guestDisplay");
-
-let guests = 3;
-let infants = 1;
-let pets = 1;
-
-function updateGuestDisplay() {
-  let text = [];
-  if (guests > 0) text.push(`${guests} Guest${guests !== 1 ? 's' : ''}`);
-  if (infants > 0) text.push(`${infants} Infant${infants !== 1 ? 's' : ''}`);
-  if (pets > 0) text.push(`${pets} Pet${pets !== 1 ? 's' : ''}`);
-  
-  if (guestDisplay) {
-    guestDisplay.textContent = text.length > 0 ? text.join(', ') : '0 Guests';
-  }
-}
-
-// Open guest modal
-if (guestSelector && guestModal) {
-  guestSelector.addEventListener("click", (e) => {
-    e.preventDefault();
-    guestModal.style.display = "flex";
-    document.body.style.overflow = "hidden";
-  });
-}
-
-// Close guest modal
-if (guestClose && guestModal) {
-  guestClose.addEventListener("click", () => {
-    guestModal.style.display = "none";
-    document.body.style.overflow = "auto";
-  });
-}
-
-// Close modal on outside click
-if (guestModal) {
-  window.addEventListener("click", (e) => {
-    if (e.target === guestModal) {
-      guestModal.style.display = "none";
-      document.body.style.overflow = "auto";
-    }
-  });
-}
-
-// Guest controls
-const guestCount = document.getElementById("guestCount");
-const infantCount = document.getElementById("infantCount");
-const petCount = document.getElementById("petCount");
-
-const guestPlus = document.getElementById("guestPlus");
-const guestMinus = document.getElementById("guestMinus");
-const infantPlus = document.getElementById("infantPlus");
-const infantMinus = document.getElementById("infantMinus");
-const petPlus = document.getElementById("petPlus");
-const petMinus = document.getElementById("petMinus");
-
-function updateButtons() {
-  if (guestMinus) guestMinus.disabled = guests <= 1;
-  if (infantMinus) infantMinus.disabled = infants <= 0;
-  if (petMinus) petMinus.disabled = pets <= 0;
-}
-
-if (guestPlus && guestCount) {
-  guestPlus.addEventListener("click", (e) => {
-    e.preventDefault();
-    guests++;
-    guestCount.textContent = guests;
-    updateGuestDisplay();
-    updateButtons();
-  });
-}
-
-if (guestMinus && guestCount) {
-  guestMinus.addEventListener("click", (e) => {
-    e.preventDefault();
-    if (guests > 1) {
-      guests--;
-      guestCount.textContent = guests;
-      updateGuestDisplay();
-      updateButtons();
-    }
-  });
-}
-
-if (infantPlus && infantCount) {
-  infantPlus.addEventListener("click", (e) => {
-    e.preventDefault();
-    infants++;
-    infantCount.textContent = infants;
-    updateGuestDisplay();
-    updateButtons();
-  });
-}
-
-if (infantMinus && infantCount) {
-  infantMinus.addEventListener("click", (e) => {
-    e.preventDefault();
-    if (infants > 0) {
-      infants--;
-      infantCount.textContent = infants;
-      updateGuestDisplay();
-      updateButtons();
-    }
-  });
-}
-
-if (petPlus && petCount) {
-  petPlus.addEventListener("click", (e) => {
-    e.preventDefault();
-    pets++;
-    petCount.textContent = pets;
-    updateGuestDisplay();
-    updateButtons();
-  });
-}
-
-if (petMinus && petCount) {
-  petMinus.addEventListener("click", (e) => {
-    e.preventDefault();
-    if (pets > 0) {
-      pets--;
-      petCount.textContent = pets;
-      updateGuestDisplay();
-      updateButtons();
-    }
-  });
-}
-
-// Initialize button states and display
-updateButtons();
-updateGuestDisplay();
-
-
-
-// DESCRIPTION SHOW MORE/LESS FUNCTIONALITY
-const toggleBtn = document.getElementById("toggleDescription");
-const extraText = document.getElementById("descriptionExtra");
-
-if (toggleBtn && extraText) {
-  toggleBtn.addEventListener("click", (e) => {
-    e.preventDefault();
-    
-    if (extraText.classList.contains("expanded")) {
-      // Collapse
-      extraText.classList.remove("expanded");
-      toggleBtn.textContent = "Show more";
-    } else {
-      // Expand
-      extraText.classList.add("expanded");
-      toggleBtn.textContent = "Show less";
-    }
-  });
-}
-
-
-
-
-// MORE VACATION RENTALS - FAVORITE FUNCTIONALITY
-const favoriteButtons = document.querySelectorAll('.favorite-btn');
-
-// Load favorites from localStorage
-function loadFavorites() {
-  const favorites = JSON.parse(localStorage.getItem('favorites') || '[]');
-  favoriteButtons.forEach(btn => {
-    const propertyId = btn.getAttribute('data-property');
-    if (favorites.includes(propertyId)) {
-      btn.classList.add('active');
-      btn.querySelector('.heart').textContent = '♥';
-    }
-  });
-}
-
-// Save favorites to localStorage
-function saveFavorites(favorites) {
-  localStorage.setItem('favorites', JSON.stringify(favorites));
-}
-
-// Toggle favorite
-favoriteButtons.forEach(btn => {
-  btn.addEventListener('click', (e) => {
-    e.preventDefault();
-    const propertyId = btn.getAttribute('data-property');
-    const heart = btn.querySelector('.heart');
-    let favorites = JSON.parse(localStorage.getItem('favorites') || '[]');
-    
-    if (btn.classList.contains('active')) {
-      // Remove from favorites
-      btn.classList.remove('active');
-      heart.textContent = '♡';
-      favorites = favorites.filter(id => id !== propertyId);
-    } else {
-      // Add to favorites
-      btn.classList.add('active');
-      heart.textContent = '♥';
-      favorites.push(propertyId);
-    }
-    
-    saveFavorites(favorites);
-  });
+pool.on('connect', () => {
+    console.log('✅ Connected to PostgreSQL database');
 });
 
-// Initialize favorites on page load
-loadFavorites();
+pool.on('error', (err) => {
+    console.error('❌ Unexpected error on idle client', err);
+    process.exit(-1);
+});
+
+// -----------------------------
+// API SERVICE (Booking.com)
+// -----------------------------
+const API_KEY = process.env.BOOKING_API_KEY || '77a4559276mshe93d7a55a4fd12fp1b5f99jsn37d157158b02';
+const API_HOST = process.env.BOOKING_API_HOST || 'booking-com15.p.rapidapi.com';
+
+const apiClient = axios.create({
+    baseURL: 'https://booking-com15.p.rapidapi.com/api/v1',
+    headers: {
+        'x-rapidapi-host': API_HOST,
+        'x-rapidapi-key': API_KEY
+    }
+});
+
+// API Functions
+const bookingAPI = {
+    searchFlightDestination: async (query) => {
+        const response = await apiClient.get('/flights/searchDestination', {
+            params: { query }
+        });
+        return response.data;
+    },
+
+    searchFlights: async (fromId, toId, params = {}) => {
+        const response = await apiClient.get('/flights/searchFlights', {
+            params: {
+                fromId,
+                toId,
+                stops: params.stops || 'none',
+                pageNo: 1,
+                adults: params.adults || 1,
+                children: params.children || 0,
+                sort: 'BEST',
+                cabinClass: params.cabinClass || 'ECONOMY',
+                currency_code: 'AED'
+            }
+        });
+        return response.data;
+    },
+
+    searchAttractionLocation: async (query) => {
+        const response = await apiClient.get('/attraction/searchLocation', {
+            params: {
+                query,
+                languagecode: 'en-us'
+            }
+        });
+        return response.data;
+    },
+
+    searchAttractions: async (destId) => {
+        const response = await apiClient.get('/attraction/searchAttractions', {
+            params: {
+                id: destId,
+                page: 1,
+                currency_code: 'AED',
+                languagecode: 'en-us'
+            }
+        });
+        return response.data;
+    }
+};
+
+// -----------------------------
+// DATABASE OPERATIONS
+// -----------------------------
+const db = {
+    saveGeoLocation: async (locationData) => {
+        const query = `
+            INSERT INTO geo_locations (location_name, country, country_code, latitude, longitude, dest_id, timezone)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            ON CONFLICT (location_name, dest_id) 
+            DO UPDATE SET 
+                country = EXCLUDED.country,
+                country_code = EXCLUDED.country_code,
+                updated_at = CURRENT_TIMESTAMP
+            RETURNING id
+        `;
+        const values = [
+            locationData.name,
+            locationData.country,
+            locationData.country_code,
+            locationData.latitude,
+            locationData.longitude,
+            locationData.dest_id,
+            locationData.timezone
+        ];
+        const result = await pool.query(query, values);
+        return result.rows[0].id;
+    },
+
+    saveFlight: async (flightData, geoLocationId) => {
+        const query = `
+            INSERT INTO flights (
+                flight_token, flight_name, flight_number, airline_name, airline_logo,
+                departure_airport, departure_airport_code, arrival_airport, arrival_airport_code,
+                departure_time, arrival_time, duration, stops, fare, currency, cabin_class, geo_location_id
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+            ON CONFLICT (flight_token) 
+            DO UPDATE SET 
+                fare = EXCLUDED.fare,
+                updated_at = CURRENT_TIMESTAMP
+            RETURNING id
+        `;
+        const values = [
+            flightData.token,
+            flightData.name,
+            flightData.number,
+            flightData.airline_name,
+            flightData.logo,
+            flightData.departure_airport,
+            flightData.departure_code,
+            flightData.arrival_airport,
+            flightData.arrival_code,
+            flightData.departure_time,
+            flightData.arrival_time,
+            flightData.duration,
+            flightData.stops,
+            flightData.fare,
+            flightData.currency,
+            flightData.cabin_class,
+            geoLocationId
+        ];
+        const result = await pool.query(query, values);
+        return result.rows[0].id;
+    },
+
+    saveAttraction: async (attractionData, geoLocationId) => {
+        const client = await pool.connect();
+        try {
+            await client.query('BEGIN');
+
+            const attractionQuery = `
+                INSERT INTO attractions (
+                    attraction_slug, attraction_name, short_description, long_description,
+                    cancellation_policy, price, currency, rating, review_count,
+                    city, country, geo_location_id
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+                ON CONFLICT (attraction_slug)
+                DO UPDATE SET
+                    attraction_name = EXCLUDED.attraction_name,
+                    price = EXCLUDED.price,
+                    rating = EXCLUDED.rating,
+                    review_count = EXCLUDED.review_count,
+                    updated_at = CURRENT_TIMESTAMP
+                RETURNING id
+            `;
+            const attractionValues = [
+                attractionData.slug,
+                attractionData.name,
+                attractionData.short_description,
+                attractionData.long_description,
+                attractionData.cancellation_policy,
+                attractionData.price,
+                attractionData.currency,
+                attractionData.rating,
+                attractionData.review_count,
+                attractionData.city,
+                attractionData.country,
+                geoLocationId
+            ];
+            const attractionResult = await client.query(attractionQuery, attractionValues);
+            const attractionId = attractionResult.rows[0].id;
+
+            await client.query('DELETE FROM attraction_images WHERE attraction_id = $1', [attractionId]);
+            await client.query('DELETE FROM attraction_inclusions WHERE attraction_id = $1', [attractionId]);
+
+            if (attractionData.images && attractionData.images.length > 0) {
+                for (let i = 0; i < attractionData.images.length; i++) {
+                    await client.query(
+                        'INSERT INTO attraction_images (attraction_id, image_url, display_order) VALUES ($1, $2, $3)',
+                        [attractionId, attractionData.images[i], i]
+                    );
+                }
+            }
+
+            if (attractionData.inclusions && attractionData.inclusions.length > 0) {
+                for (const inclusion of attractionData.inclusions) {
+                    await client.query(
+                        'INSERT INTO attraction_inclusions (attraction_id, inclusion_text) VALUES ($1, $2)',
+                        [attractionId, inclusion]
+                    );
+                }
+            }
+
+            await client.query('COMMIT');
+            return attractionId;
+        } catch (error) {
+            await client.query('ROLLBACK');
+            throw error;
+        } finally {
+            client.release();
+        }
+    },
+
+    getFlightById: async (id) => {
+        const query = `
+            SELECT f.*, g.location_name, g.country, g.country_code, g.latitude, g.longitude
+            FROM flights f
+            JOIN geo_locations g ON f.geo_location_id = g.id
+            WHERE f.id = $1
+        `;
+        const result = await pool.query(query, [id]);
+        return result.rows[0];
+    },
+
+    getAttractionById: async (id) => {
+        const query = `
+            SELECT a.*, g.location_name, g.country, g.country_code, g.latitude, g.longitude,
+                   json_agg(DISTINCT jsonb_build_object('url', ai.image_url, 'order', ai.display_order)) 
+                       FILTER (WHERE ai.id IS NOT NULL) as images,
+                   json_agg(DISTINCT ainc.inclusion_text) 
+                       FILTER (WHERE ainc.id IS NOT NULL) as inclusions
+            FROM attractions a
+            JOIN geo_locations g ON a.geo_location_id = g.id
+            LEFT JOIN attraction_images ai ON a.id = ai.attraction_id
+            LEFT JOIN attraction_inclusions ainc ON a.id = ainc.attraction_id
+            WHERE a.id = $1
+            GROUP BY a.id, g.location_name, g.country, g.country_code, g.latitude, g.longitude
+        `;
+        const result = await pool.query(query, [id]);
+        return result.rows[0];
+    }
+};
+
+// -----------------------------
+// EXPRESS API SERVER
+// -----------------------------
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+app.use(cors());
+app.use(express.json());
+
+app.use((req, res, next) => {
+    console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
+    next();
+});
+
+// -----------------------------
+// ENDPOINT 1: /search/:locationname
+// -----------------------------
+app.get('/search/:locationname', async (req, res) => {
+    const { locationname } = req.params;
+
+    try {
+        console.log(`🔍 Searching for location: ${locationname}`);
+
+        const locationSearchResults = await bookingAPI.searchAttractionLocation(locationname);
+        
+        console.log('📦 API Response:', JSON.stringify(locationSearchResults, null, 2));
+
+        // Handle different response structures
+        let locationData = null;
+        
+        if (locationSearchResults.data && Array.isArray(locationSearchResults.data) && locationSearchResults.data.length > 0) {
+            locationData = locationSearchResults.data;
+        } else if (locationSearchResults.data && locationSearchResults.data.destinations) {
+            locationData = locationSearchResults.data.destinations;
+        } else if (Array.isArray(locationSearchResults) && locationSearchResults.length > 0) {
+            locationData = locationSearchResults;
+        }
+
+        if (!locationData || locationData.length === 0) {
+            return res.status(404).json({
+                error: 'Location not found',
+                message: `No results found for "${locationname}"`,
+                debug: locationSearchResults
+            });
+        }
+
+        const locationInfo = locationData[0];
+        console.log('📍 Location Info:', locationInfo);
+
+        // Extract location details with fallbacks
+        const geoData = {
+            name: locationInfo.city_name || locationInfo.name || locationInfo.label || locationname,
+            country: locationInfo.country || locationInfo.country_name || 'Unknown',
+            country_code: locationInfo.cc1 || locationInfo.country_code || locationInfo.cc || '',
+            latitude: locationInfo.latitude || locationInfo.lat || null,
+            longitude: locationInfo.longitude || locationInfo.lon || locationInfo.lng || null,
+            dest_id: locationInfo.dest_id || locationInfo.id || `dest_${Date.now()}`,
+            timezone: locationInfo.timezone || locationInfo.tz || null
+        };
+
+        console.log('💾 Saving geo location:', geoData);
+        const geoLocationId = await db.saveGeoLocation(geoData);
+
+        let flights = [];
+        try {
+            const flightDestSearch = await bookingAPI.searchFlightDestination(locationname);
+            console.log('✈️ Flight destination search:', flightDestSearch);
+            
+            if (flightDestSearch.data && flightDestSearch.data.length > 0) {
+                const airportCode = flightDestSearch.data[0].code || flightDestSearch.data[0].id;
+                const fromId = `${airportCode}.AIRPORT`;
+                
+                console.log(`🛫 Searching flights to: ${fromId}`);
+                const flightResults = await bookingAPI.searchFlights('JFK.AIRPORT', fromId);
+                
+                if (flightResults.data && flightResults.data.flightOffers) {
+                    console.log(`✅ Found ${flightResults.data.flightOffers.length} flight offers`);
+                    
+                    for (const offer of flightResults.data.flightOffers.slice(0, 10)) {
+                        const segments = offer.segments || [];
+                        const firstSegment = segments[0] || {};
+                        const lastSegment = segments[segments.length - 1] || {};
+                        
+                        const flightData = {
+                            token: offer.token || `flight_${Date.now()}_${Math.random()}`,
+                            name: `${firstSegment.legs?.[0]?.carriersData?.[0]?.name || 'Unknown'} ${firstSegment.legs?.[0]?.flightInfo?.flightNumber || ''}`,
+                            number: firstSegment.legs?.[0]?.flightInfo?.flightNumber || '',
+                            airline_name: firstSegment.legs?.[0]?.carriersData?.[0]?.name || 'Unknown',
+                            logo: firstSegment.legs?.[0]?.carriersData?.[0]?.logo || '',
+                            departure_airport: firstSegment.departureAirport?.name || 'Unknown',
+                            departure_code: firstSegment.departureAirport?.code || 'JFK',
+                            arrival_airport: lastSegment.arrivalAirport?.name || 'Unknown',
+                            arrival_code: lastSegment.arrivalAirport?.code || airportCode,
+                            departure_time: firstSegment.departureTime || null,
+                            arrival_time: lastSegment.arrivalTime || null,
+                            duration: offer.totalDuration || '',
+                            stops: segments.length - 1,
+                            fare: offer.priceBreakdown?.total?.units || 0,
+                            currency: 'AED',
+                            cabin_class: 'ECONOMY'
+                        };
+
+                        await db.saveFlight(flightData, geoLocationId);
+                        flights.push(flightData);
+                    }
+                }
+            }
+        } catch (flightError) {
+            console.warn('⚠️ Flight search error:', flightError.message);
+        }
+
+        const attractions = [];
+        try {
+            const destId = locationInfo.dest_id || locationInfo.id;
+            console.log(`🎡 Searching attractions for dest_id: ${destId}`);
+            
+            const attractionResults = await bookingAPI.searchAttractions(destId);
+            console.log('🎯 Attraction results:', attractionResults.data ? 'Found' : 'Not found');
+            
+            if (attractionResults.data && attractionResults.data.products) {
+                console.log(`✅ Found ${attractionResults.data.products.length} attractions`);
+                
+                for (const product of attractionResults.data.products.slice(0, 20)) {
+                    const attractionData = {
+                        slug: product.slug || product.id || `attraction_${Date.now()}_${Math.random()}`,
+                        name: product.name || 'Unknown Attraction',
+                        short_description: product.shortDescription || product.short_description || '',
+                        long_description: product.description || product.long_description || '',
+                        cancellation_policy: product.cancellationPolicy?.description || product.cancellation_policy || '',
+                        price: product.pricing?.price?.value || product.price || 0,
+                        currency: 'AED',
+                        rating: product.reviewsStats?.avg || product.rating || 0,
+                        review_count: product.reviewsStats?.total || product.reviewCount || product.review_count || 0,
+                        city: geoData.name,
+                        country: geoData.country,
+                        images: product.images?.map(img => img.url || img) || [],
+                        inclusions: product.inclusions || []
+                    };
+
+                    await db.saveAttraction(attractionData, geoLocationId);
+                    attractions.push(attractionData);
+                }
+            }
+        } catch (attractionError) {
+            console.warn('⚠️ Attraction search error:', attractionError.message);
+            console.error('Full error:', attractionError);
+        }
+
+        const response = {
+            GeoInfo: {
+                location_name: geoData.name,
+                country: geoData.country,
+                country_code: geoData.country_code,
+                dest_id: geoData.dest_id,
+                latitude: geoData.latitude,
+                longitude: geoData.longitude,
+                timezone: geoData.timezone,
+                label: locationInfo.label || geoData.name
+            },
+            Flights: flights,
+            Attractions: attractions
+        };
+
+        console.log(`✅ Found ${flights.length} flights and ${attractions.length} attractions`);
+        res.json(response);
+
+    } catch (error) {
+        console.error('❌ Error in /search endpoint:', error);
+        console.error('Error stack:', error.stack);
+        res.status(500).json({
+            error: 'Internal server error',
+            message: error.message,
+            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        });
+    }
+});
+
+// -----------------------------
+// ENDPOINT 2: /details/:id
+// -----------------------------
+app.get('/details/:id', async (req, res) => {
+    const { id } = req.params;
+    const { searchtype } = req.query;
+
+    try {
+        if (!searchtype || !['flight', 'attraction'].includes(searchtype.toLowerCase())) {
+            return res.status(400).json({
+                error: 'Invalid search type',
+                message: 'searchtype must be either "flight" or "attraction"'
+            });
+        }
+
+        if (searchtype.toLowerCase() === 'flight') {
+            const flight = await db.getFlightById(id);
+            
+            if (!flight) {
+                return res.status(404).json({
+                    error: 'Flight not found',
+                    message: `No flight found with id ${id}`
+                });
+            }
+
+            const response = {
+                GeoInfo: {
+                    location_name: flight.location_name,
+                    country: flight.country,
+                    country_code: flight.country_code,
+                    latitude: flight.latitude,
+                    longitude: flight.longitude
+                },
+                Flight: {
+                    id: flight.id,
+                    flight_token: flight.flight_token,
+                    flight_name: flight.flight_name,
+                    flight_number: flight.flight_number,
+                    airline_name: flight.airline_name,
+                    airline_logo: flight.airline_logo,
+                    departure: {
+                        airport: flight.departure_airport,
+                        airport_code: flight.departure_airport_code,
+                        time: flight.departure_time
+                    },
+                    arrival: {
+                        airport: flight.arrival_airport,
+                        airport_code: flight.arrival_airport_code,
+                        time: flight.arrival_time
+                    },
+                    duration: flight.duration,
+                    stops: flight.stops,
+                    fare: {
+                        amount: flight.fare,
+                        currency: flight.currency
+                    },
+                    cabin_class: flight.cabin_class,
+                    created_at: flight.created_at
+                }
+            };
+
+            res.json(response);
+
+        } else {
+            const attraction = await db.getAttractionById(id);
+            
+            if (!attraction) {
+                return res.status(404).json({
+                    error: 'Attraction not found',
+                    message: `No attraction found with id ${id}`
+                });
+            }
+
+            const response = {
+                GeoInfo: {
+                    location_name: attraction.location_name,
+                    country: attraction.country,
+                    country_code: attraction.country_code,
+                    latitude: attraction.latitude,
+                    longitude: attraction.longitude
+                },
+                Attraction: {
+                    id: attraction.id,
+                    slug: attraction.attraction_slug,
+                    name: attraction.attraction_name,
+                    description: {
+                        short: attraction.short_description,
+                        long: attraction.long_description
+                    },
+                    location: {
+                        city: attraction.city,
+                        country: attraction.country
+                    },
+                    pricing: {
+                        amount: attraction.price,
+                        currency: attraction.currency
+                    },
+                    rating: {
+                        score: attraction.rating,
+                        review_count: attraction.review_count
+                    },
+                    cancellation_policy: attraction.cancellation_policy,
+                    images: attraction.images || [],
+                    inclusions: attraction.inclusions || [],
+                    created_at: attraction.created_at
+                }
+            };
+
+            res.json(response);
+        }
+
+    } catch (error) {
+        console.error('❌ Error in /details endpoint:', error);
+        res.status(500).json({
+            error: 'Internal server error',
+            message: error.message
+        });
+    }
+});
+
+// Health check
+app.get('/health', (req, res) => {
+    res.json({
+        status: 'OK',
+        timestamp: new Date().toISOString(),
+        database: 'connected'
+    });
+});
+
+// Get all locations
+app.get('/locations', async (req, res) => {
+    try {
+        const result = await pool.query('SELECT * FROM geo_locations ORDER BY created_at DESC');
+        res.json(result.rows);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Error handling middleware
+app.use((err, req, res, next) => {
+    console.error('❌ Unhandled error:', err);
+    res.status(500).json({
+        error: 'Internal server error',
+        message: err.message
+    });
+});
+
+// 404 handler
+app.use((req, res) => {
+    res.status(404).json({
+        error: 'Not found',
+        message: `Route ${req.method} ${req.path} not found`
+    });
+});
+
+// Start server
+app.listen(PORT, () => {
+    console.log(`
+    ╔════════════════════════════════════════════╗
+    ║   🚀 Travel API Server Started             ║
+    ║   📍 Port: ${PORT}                            ║
+    ║   🗄️  Database: PostgreSQL                 ║
+    ║   ✅ Status: Ready                          ║
+    ╚════════════════════════════════════════════╝
+    
+    Available endpoints:
+    - GET  /search/:locationname
+    - GET  /details/:id?searchtype=flight|attraction
+    - GET  /health
+    - GET  /locations
+    `);
+});
+
+// Graceful shutdown
+process.on('SIGTERM', () => {
+    console.log('SIGTERM signal received: closing HTTP server');
+    pool.end(() => {
+        console.log('Database pool has ended');
+    });
+});
+
+module.exports = app;
